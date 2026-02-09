@@ -76,9 +76,8 @@ attempt_reconnect() {
     cat "$FRIDA_SCRIPT" >> "$tmp_script"
 
     # Run frida with a timeout to prevent hangs.
-    # --no-pause: don't pause the target process
     # -q: quiet mode (suppress banner)
-    if timeout "$FRIDA_TIMEOUT" frida -n "FortiClient" -l "$tmp_script" --no-pause -q 2>&1 | while IFS= read -r line; do
+    if timeout "$FRIDA_TIMEOUT" frida -n "FortiClient" -l "$tmp_script" -q 2>&1 | while IFS= read -r line; do
         log "  frida: $line"
     done; then
         log "Frida reconnect command completed."
