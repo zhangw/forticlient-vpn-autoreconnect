@@ -12,10 +12,20 @@
 POLL_INTERVAL=10          # seconds between connectivity checks
 RECONNECT_COOLDOWN=30     # seconds to wait after a reconnect attempt
 VPN_INTERNAL_HOST=""      # ping target inside VPN (leave empty to skip)
-VPN_USERNAME="zw@webull.com"  # FortiClient VPN username
-VPN_CONN_NAME="webull"        # FortiClient connection name
 FRIDA_SCRIPT="$(cd "$(dirname "$0")" && pwd)/forti_client_guimessenger_connect_tunnel_invoke.js"
 FRIDA_TIMEOUT=15          # seconds before killing a hung frida invocation
+
+# Per-user VPN credentials — loaded from vpn_monitor.conf
+# Copy vpn_monitor.conf.example to vpn_monitor.conf and fill in your values.
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+CONF_FILE="${SCRIPT_DIR}/vpn_monitor.conf"
+if [[ -f "$CONF_FILE" ]]; then
+    source "$CONF_FILE"
+else
+    echo "ERROR: Config file not found: ${CONF_FILE}"
+    echo "Copy vpn_monitor.conf.example to vpn_monitor.conf and fill in your values."
+    exit 1
+fi
 # ─────────────────────────────────────────────────────────────────────
 
 last_reconnect_ts=0

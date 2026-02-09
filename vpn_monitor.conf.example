@@ -1,0 +1,4 @@
+# vpn_monitor.conf — per-user VPN settings (not tracked by git)
+# Copy this file to vpn_monitor.conf and fill in your values.
+VPN_USERNAME="you@example.com"
+VPN_CONN_NAME="your_vpn"
