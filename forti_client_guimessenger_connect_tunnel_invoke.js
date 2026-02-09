@@ -1,3 +1,13 @@
+// Expects `userName` and `connName` to be defined before this script runs.
+// When used via vpn_monitor.sh they are injected automatically.
+// For standalone use, prepend:
+//   const userName = "you@example.com";
+//   const connName = "your_vpn";
+
+if (typeof userName === 'undefined' || typeof connName === 'undefined') {
+  console.log('ERROR: userName and connName must be defined before loading this script.');
+} else {
+
 // lookup the connectTunnel func address, for example: 0x107b91904
 const moduleName = 'guimessenger_jyp.node';
 const connectTunnelFunctionName = 'connectTunnel';
@@ -5,7 +15,7 @@ const funcAddress = Module.findExportByName(moduleName, connectTunnelFunctionNam
 if (funcAddress) {
   console.log(`Address of ${connectTunnelFunctionName} in ${moduleName}: ${funcAddress}`);
 
-  const addrConnectTunnel = ptr(funcAddress); 
+  const addrConnectTunnel = ptr(funcAddress);
 
   const fnConnectTunnel = new NativeFunction(addrConnectTunnel, 'pointer', ['pointer']);
 
@@ -13,8 +23,6 @@ if (funcAddress) {
   const connJSONStrTpl = '{"connection_name":"xxx","connection_type":"ssl","password":"","username":"xxx","save_username":false,"save_password":"0","always_up":"0","auto_connect":"0","saml_error":1,"saml_type":1}';
   const connObject = JSON.parse(connJSONStrTpl);
 
-  const userName = "zw@webull.com"; 
-  const connName = "webull";
   connObject.connection_name = connName;
   connObject.username = userName;
 
@@ -54,4 +62,6 @@ if (funcAddress) {
 } else {
   console.log(`${connectTunnelFunctionName} not found in ${moduleName}.`);
 }
+
+} // end userName/connName guard
 

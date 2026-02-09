@@ -12,6 +12,8 @@
 POLL_INTERVAL=10          # seconds between connectivity checks
 RECONNECT_COOLDOWN=30     # seconds to wait after a reconnect attempt
 VPN_INTERNAL_HOST=""      # ping target inside VPN (leave empty to skip)
+VPN_USERNAME="zw@webull.com"  # FortiClient VPN username
+VPN_CONN_NAME="webull"        # FortiClient connection name
 FRIDA_SCRIPT="$(cd "$(dirname "$0")" && pwd)/forti_client_guimessenger_connect_tunnel_invoke.js"
 FRIDA_TIMEOUT=15          # seconds before killing a hung frida invocation
 # ─────────────────────────────────────────────────────────────────────
@@ -63,16 +65,28 @@ attempt_reconnect() {
     log "VPN down — triggering one-shot Frida reconnect..."
     last_reconnect_ts=$now
 
+    # Build a temp script: config preamble + core logic.
+    # Frida scripts run in isolated scopes, so we concatenate them into one file.
+    local tmp_script
+    tmp_script=$(mktemp /tmp/frida_reconnect.XXXXXX.js)
+    printf 'const userName = %s;\nconst connName = %s;\n' \
+        "$(printf '%s' "$VPN_USERNAME" | python3 -c 'import sys,json; print(json.dumps(sys.stdin.read()))')" \
+        "$(printf '%s' "$VPN_CONN_NAME" | python3 -c 'import sys,json; print(json.dumps(sys.stdin.read()))')" \
+        > "$tmp_script"
+    cat "$FRIDA_SCRIPT" >> "$tmp_script"
+
     # Run frida with a timeout to prevent hangs.
     # --no-pause: don't pause the target process
     # -q: quiet mode (suppress banner)
-    if timeout "$FRIDA_TIMEOUT" frida -n "FortiClient" -l "$FRIDA_SCRIPT" --no-pause -q 2>&1 | while IFS= read -r line; do
+    if timeout "$FRIDA_TIMEOUT" frida -n "FortiClient" -l "$tmp_script" --no-pause -q 2>&1 | while IFS= read -r line; do
         log "  frida: $line"
     done; then
         log "Frida reconnect command completed."
     else
         log "Frida reconnect command failed or timed out."
     fi
+
+    rm -f "$tmp_script"
 }
 
 # ── Main loop ────────────────────────────────────────────────────────
@@ -81,6 +95,8 @@ log "VPN Monitor started."
 log "  Poll interval : ${POLL_INTERVAL}s"
 log "  Cooldown      : ${RECONNECT_COOLDOWN}s"
 log "  VPN host check: ${VPN_INTERNAL_HOST:-"(none — using utun detection)"}"
+log "  VPN username  : ${VPN_USERNAME}"
+log "  VPN conn name : ${VPN_CONN_NAME}"
 log "  Frida script  : ${FRIDA_SCRIPT}"
 log ""
 
