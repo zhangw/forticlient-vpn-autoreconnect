@@ -87,13 +87,20 @@ attempt_reconnect() {
 
     # Run frida with a timeout to prevent hangs.
     # -q: quiet mode (suppress banner)
-    if timeout "$FRIDA_TIMEOUT" frida -n "FortiClient" -l "$tmp_script" -q 2>&1 | while IFS= read -r line; do
+    # < /dev/null: feed EOF to stdin so frida exits immediately after the
+    #   script finishes instead of waiting in its REPL.  Without this, frida
+    #   stays attached to FortiClient for up to FRIDA_TIMEOUT seconds, and
+    #   that instrumentation blocks the VPN from actually reconnecting.
+    if timeout "$FRIDA_TIMEOUT" frida -n "FortiClient" -l "$tmp_script" -q < /dev/null 2>&1 | while IFS= read -r line; do
         log "  frida: $line"
     done; then
         log "Frida reconnect command completed."
     else
         log "Frida reconnect command failed or timed out."
     fi
+
+    # Give FortiClient a moment to start the tunnel after frida detaches.
+    sleep 2
 
     rm -f "$tmp_script"
 }
