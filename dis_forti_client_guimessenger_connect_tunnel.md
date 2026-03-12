@@ -173,13 +173,13 @@ memory read -b $sp+0x18
 ```
 字符串的data_ptr地址可能是首8个字节，为**0x600000aee080**，长度是下8个字节，为**0xc7**
 ```
-memory read --format Y --count 0xc7 0x600000aee080
+memory read --format Y --count 0xc9 0x600000aee080
 0x600000aee080: 7b 22 63 6f 6e 6e 65 63 74 69 6f 6e 5f 6e 61 6d  {"connection_nam
-0x600000aee090: 65 22 3a 22 77 65 62 75 6c 6c 22 2c 22 63 6f 6e  e":"webull","con
-0x600000aee0a0: 6e 65 63 74 69 6f 6e 5f 74 79 70 65 22 3a 22 73  nection_type":"s
-0x600000aee0b0: 73 6c 22 2c 22 70 61 73 73 77 6f 72 64 22 3a 22  sl","password":"
-0x600000aee0c0: 22 2c 22 75 73 65 72 6e 61 6d 65 22 3a 22 7a 77  ","username":"zw
-0x600000aee0d0: 40 77 65 62 75 6c 6c 2e 63 6f 6d 22 2c 22 73 61  @webull.com","sa
+0x600000aee090: 65 22 3a 22 6e 38 64 6a 64 34 35 22 2c 22 63 6f  e":"n8djd45","co
+0x600000aee0a0: 6e 6e 65 63 74 69 6f 6e 5f 74 79 70 65 22 3a 22  nnection_type":"
+0x600000aee0b0: 73 73 6c 22 2c 22 70 61 73 73 77 6f 72 64 22 3a  ssl","password":
+0x600000aee0c0: 22 22 2c 22 75 73 65 72 6e 61 6d 65 22 3a 22 7a  "","username":"z
+0x600000aee0d0: 77 40 6e 38 64 6a 64 34 35 2e 63 6f 6d 22 2c 22  w@n8djd45.com","
 0x600000aee0e0: 76 65 5f 75 73 65 72 6e 61 6d 65 22 3a 66 61 6c  ve_username":fal
 0x600000aee0f0: 73 65 2c 22 73 61 76 65 5f 70 61 73 73 77 6f 72  se,"save_passwor
 0x600000aee100: 64 22 3a 22 30 22 2c 22 61 6c 77 61 79 73 5f 75  d":"0","always_u
@@ -194,13 +194,13 @@ memory read --format Y --count 0xc7 0x600000aee080
 (lldb) memory read $x0
 0x16f327e00: 00 e7 ae 00 00 60 00 00 c7 00 00 00 00 00 00 00  .....`..........
 0x16f327e10: c8 00 00 00 00 00 00 80 80 e0 ae 00 00 60 00 00  .............`..
-(lldb) memory read --format Y --count 0xc7 0x600000aee700
+(lldb) memory read --format Y --count 0xc9 0x600000aee700
 0x600000aee700: 7b 22 63 6f 6e 6e 65 63 74 69 6f 6e 5f 6e 61 6d  {"connection_nam
-0x600000aee710: 65 22 3a 22 77 65 62 75 6c 6c 22 2c 22 63 6f 6e  e":"webull","con
-0x600000aee720: 6e 65 63 74 69 6f 6e 5f 74 79 70 65 22 3a 22 73  nection_type":"s
-0x600000aee730: 73 6c 22 2c 22 70 61 73 73 77 6f 72 64 22 3a 22  sl","password":"
-0x600000aee740: 22 2c 22 75 73 65 72 6e 61 6d 65 22 3a 22 7a 77  ","username":"zw
-0x600000aee750: 40 77 65 62 75 6c 6c 2e 63 6f 6d 22 2c 22 73 61  @webull.com","sa
+0x600000aee710: 65 22 3a 22 6e 38 64 6a 64 34 35 22 2c 22 63 6f  e":"n8djd45","co
+0x600000aee720: 6e 6e 65 63 74 69 6f 6e 5f 74 79 70 65 22 3a 22  nnection_type":"
+0x600000aee730: 73 73 6c 22 2c 22 70 61 73 73 77 6f 72 64 22 3a  ssl","password":
+0x600000aee740: 22 22 2c 22 75 73 65 72 6e 61 6d 65 22 3a 22 7a  "","username":"z
+0x600000aee750: 77 40 6e 38 64 6a 64 34 35 2e 63 6f 6d 22 2c 22  w@n8djd45.com","
 0x600000aee760: 76 65 5f 75 73 65 72 6e 61 6d 65 22 3a 66 61 6c  ve_username":fal
 0x600000aee770: 73 65 2c 22 73 61 76 65 5f 70 61 73 73 77 6f 72  se,"save_passwor
 0x600000aee780: 64 22 3a 22 30 22 2c 22 61 6c 77 61 79 73 5f 75  d":"0","always_u

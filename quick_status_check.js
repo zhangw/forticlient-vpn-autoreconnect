@@ -46,10 +46,10 @@ if (getStateAddr) {
     console.log(`getConnectionStateString() no-arg failed: ${e.message}`);
   }
 
-  // Try with a std::string arg (tunnel name "webull")
+  // Try with a std::string arg (tunnel name "n8djd45")
   try {
     const fn2 = new NativeFunction(getStateAddr, 'pointer', ['pointer']);
-    const tunnelName = "webull";
+    const tunnelName = "n8djd45";
     const utf8buf = Memory.allocUtf8String(tunnelName);
     const strLen = tunnelName.length;
     const strControlBase = 0x8000000000000000n;
@@ -59,12 +59,12 @@ if (getStateAddr) {
     Memory.writeU64(strMem.add(8), strLen);
     Memory.writeU64(strMem.add(16), uint64(full64.toString()));
     const ret2 = fn2(strMem);
-    console.log(`getConnectionStateString(&"webull") ptr = ${ret2}`);
+    console.log(`getConnectionStateString(&"n8djd45") ptr = ${ret2}`);
     if (!ret2.isNull()) {
       try { console.log(`  as CString: ${ret2.readCString()}`); } catch(e) {}
     }
   } catch(e) {
-    console.log(`getConnectionStateString(&"webull") failed: ${e.message}`);
+    console.log(`getConnectionStateString(&"n8djd45") failed: ${e.message}`);
   }
 }
 

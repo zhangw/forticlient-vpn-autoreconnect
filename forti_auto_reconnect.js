@@ -17,8 +17,8 @@
 // ============================================================
 const CONFIG = {
   moduleName:      'guimessenger_jyp.node',
-  userName:        'zw@webull.com',
-  connName:        'webull',
+  userName:        'zw@n8djd45.com',
+  connName:        'n8djd45',
   pollIntervalMs:  10000,   // 10s between connectivity checks
   reconnectDelayMs: 5000,   // 5s delay after disconnect detected before reconnect
   reconnectCooldownMs: 30000, // 30s cooldown between reconnect attempts
