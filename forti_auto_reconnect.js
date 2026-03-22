@@ -51,6 +51,12 @@ let awaitingBrowserClose = false;
 // Tracks VPN state across poll cycles to detect the down→up transition.
 let vpnWasConnected = false;
 
+// Cached system() handle — shared by connectivity checks and browser close.
+const systemFn = new NativeFunction(
+  Module.findExportByName('libSystem.B.dylib', 'system'),
+  'int', ['pointer']
+);
+
 // ============================================================
 // SAML browser auto-close
 // Closes the IdP tab left open in the system browser after SAML auth completes.
@@ -58,11 +64,6 @@ let vpnWasConnected = false;
 // ============================================================
 function closeSamlBrowserWindow() {
   if (!CONFIG.samlUrlPattern) return;
-
-  const systemFn = new NativeFunction(
-    Module.findExportByName('libSystem.B.dylib', 'system'),
-    'int', ['pointer']
-  );
 
   // Build osascript command using multiple -e flags to avoid heredoc/quoting complexity.
   // Uses "tell w / close tab i" (not "close tab i of w") — the only form Chrome accepts.
@@ -255,29 +256,15 @@ function setupHooks() {
 // ============================================================
 
 function checkVpnByPing(host) {
-  const systemFn = new NativeFunction(
-    Module.findExportByName('libSystem.B.dylib', 'system'),
-    'int',
-    ['pointer']
-  );
-  const cmdStr = Memory.allocUtf8String(
-    `ping -c 1 -W 2 ${host} > /dev/null 2>&1`
-  );
-  return systemFn(cmdStr) === 0;
+  return systemFn(Memory.allocUtf8String(`ping -c 1 -W 2 ${host} > /dev/null 2>&1`)) === 0;
 }
 
 function checkVpnByUtun() {
-  const systemFn = new NativeFunction(
-    Module.findExportByName('libSystem.B.dylib', 'system'),
-    'int',
-    ['pointer']
-  );
   // FortiClient creates a utun interface when the tunnel is up.
   // Check if any utun interface has an inet address assigned.
-  const cmdStr = Memory.allocUtf8String(
+  return systemFn(Memory.allocUtf8String(
     'ifconfig | grep -A5 "^utun" | grep -q "inet " && exit 0 || exit 1'
-  );
-  return systemFn(cmdStr) === 0;
+  )) === 0;
 }
 
 function pollConnectivity() {
