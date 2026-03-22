@@ -2,3 +2,11 @@
 # Copy this file to vpn_monitor.conf and fill in your values.
 VPN_USERNAME="you@example.com"
 VPN_CONN_NAME="your_vpn"
+
+# ── SAML browser auto-close ───────────────────────────────────────────
+# After a SAML reconnect, the system browser is left open on the IdP page.
+# Set SAML_URL_PATTERN to a substring of that URL (e.g. your IdP domain)
+# and the matching tab will be closed automatically once the VPN is back up.
+# Leave SAML_URL_PATTERN empty to disable.
+SAML_BROWSER="Google Chrome" # browser app name: Safari | Google Chrome | Brave Browser | Firefox
+SAML_URL_PATTERN="127.0.0.1:8020"  # FortiClient's local SAML callback server — works for any IdP
