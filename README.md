@@ -17,6 +17,12 @@ Both modes call `connectTunnel` in FortiClient's `guimessenger_jyp.node` native 
 
 ## Quick Start
 
+## Version Compatibility
+
+Tested against FortiClient for macOS `7.2.9.1033` (`CFBundleShortVersionString` from `/Applications/FortiClient.app/Contents/Info.plist`).
+
+This project depends on reverse-engineered native symbols and an arm64 `std::string` layout inside `guimessenger_jyp.node`, so behavior may change across FortiClient releases. If reconnect behavior breaks after an upgrade, verify the FortiClient version first and re-check the exported symbols / calling convention.
+
 ### Prerequisites
 
 - macOS (ARM64 / Apple Silicon)
@@ -39,6 +45,12 @@ cp vpn_monitor.conf.example vpn_monitor.conf
 ```
 
 The monitor will poll every 10 seconds and trigger a one-shot Frida reconnect when the VPN is down.
+
+## Testing
+
+Manual integration testing is documented in [`docs/manual-testing.md`](/Users/vincent/Desktop/forti_tool/docs/manual-testing.md). Use that guide for QA runs, regression checks after FortiClient upgrades, and failure triage with the diagnostic Frida scripts.
+
+Code review findings and follow-up questions are documented in [`docs/code-review-2026-03-22.md`](/Users/vincent/Desktop/forti_tool/docs/code-review-2026-03-22.md).
 
 ## Scripts Reference
 
@@ -107,7 +119,7 @@ Copy the example config: `cp vpn_monitor.conf.example vpn_monitor.conf` and fill
 Increase `RECONNECT_COOLDOWN` to give the tunnel more time to stabilize. If using ping-based detection, also increase `POLL_INTERVAL` to avoid triggering reconnects while the tunnel is still negotiating.
 
 **"connectTunnel not found"**
-The `guimessenger_jyp.node` module hasn't been loaded yet. Make sure FortiClient's main window is open (not just the tray icon).
+The `guimessenger_jyp.node` module hasn't been loaded yet, or the symbol/export changed in your FortiClient version. Make sure FortiClient's main window is open (not just the tray icon), then compare your installed version against the tested version above.
 
 **Monitor works but dies on sleep/wake**
 This is expected for the resident mode (`forti_auto_reconnect.js`). Use `vpn_monitor.sh` instead — it runs outside FortiClient and survives sleep/wake.

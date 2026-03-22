@@ -6,6 +6,12 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 **forti_tool** — Auto-reconnect FortiClient VPN on macOS using [Frida](https://frida.re). When the VPN drops (sleep/wake, network change, idle timeout), the tunnel is re-established automatically via FortiClient's native `connectTunnel` function — no password re-entry needed for SAML/SSO connections.
 
+## Tested FortiClient Version
+
+- FortiClient for macOS `7.2.9.1033` (`CFBundleShortVersionString` from `/Applications/FortiClient.app/Contents/Info.plist`)
+
+Because this repo relies on reverse-engineered native exports and a version-sensitive arm64 libc++ `std::string` layout, always capture the FortiClient version when triaging reconnect failures or symbol mismatches.
+
 ## Running the Monitor
 
 ### Recommended: External polling mode (survives sleep/wake)
@@ -89,4 +95,4 @@ Tunables in the `CONFIG` object at the top of `forti_auto_reconnect.js`: `userNa
 
 ## Reverse Engineering Notes
 
-`dis_forti_client_guimessenger_connect_tunnel.md` contains lldb session transcripts and ARM64 disassembly of `MessageSender::ConnectTunnel` — useful reference if FortiClient updates change the `std::string` layout or function signatures.
+`dis_forti_client_guimessenger_connect_tunnel.md` contains lldb session transcripts and ARM64 disassembly of `MessageSender::ConnectTunnel` — useful reference if FortiClient updates change the `std::string` layout or function signatures for versions newer than `7.2.9.1033`.
