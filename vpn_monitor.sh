@@ -12,6 +12,8 @@
 POLL_INTERVAL=10          # seconds between connectivity checks
 RECONNECT_COOLDOWN=30     # seconds to wait after a reconnect attempt
 VPN_INTERNAL_HOST=""      # ping target inside VPN (leave empty to skip)
+SAML_BROWSER="Google Chrome"    # browser app name for SAML tab auto-close
+SAML_URL_PATTERN="127.0.0.1:8020"  # FortiClient's local SAML callback server
 FRIDA_SCRIPT="$(cd "$(dirname "$0")" && pwd)/forti_client_guimessenger_connect_tunnel_invoke.js"
 FRIDA_TIMEOUT=15          # seconds before killing a hung frida invocation
 
@@ -20,6 +22,7 @@ FRIDA_TIMEOUT=15          # seconds before killing a hung frida invocation
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 CONF_FILE="${SCRIPT_DIR}/vpn_monitor.conf"
 if [[ -f "$CONF_FILE" ]]; then
+    # shellcheck source=/dev/null
     source "$CONF_FILE"
 else
     echo "ERROR: Config file not found: ${CONF_FILE}"
@@ -29,6 +32,7 @@ fi
 # ─────────────────────────────────────────────────────────────────────
 
 last_reconnect_ts=0
+vpn_was_down=false  # tracks VPN state across poll cycles for transition detection
 
 log() {
     echo "[$(date '+%Y-%m-%d %H:%M:%S')] $*"
@@ -58,6 +62,31 @@ vpn_is_up() {
     else
         check_utun_interface
     fi
+}
+
+# ── SAML browser auto-close ──────────────────────────────────────────
+
+close_saml_browser_window() {
+    # Closes the browser tab left open after SAML/SSO auth.
+    # The tab shows the FortiClient local SAML callback page (127.0.0.1:8020).
+    # Iterates by index in reverse so closing a tab doesn't invalidate later references.
+    [[ -z "$SAML_URL_PATTERN" ]] && return
+    log "Closing SAML browser tab (browser: $SAML_BROWSER, pattern: $SAML_URL_PATTERN)..."
+    osascript 2>/dev/null <<OSAEOF
+tell application "$SAML_BROWSER"
+    repeat with w in windows
+        tell w
+            set n to count tabs
+            repeat with i from n to 1 by -1
+                if URL of tab i contains "$SAML_URL_PATTERN" then
+                    close tab i
+                end if
+            end repeat
+        end tell
+    end repeat
+end tell
+OSAEOF
+    log "SAML browser close done."
 }
 
 # ── Reconnect via one-shot Frida ─────────────────────────────────────
@@ -114,6 +143,8 @@ log "  VPN host check: ${VPN_INTERNAL_HOST:-"(none — using utun detection)"}"
 log "  VPN username  : ${VPN_USERNAME}"
 log "  VPN conn name : ${VPN_CONN_NAME}"
 log "  Frida script  : ${FRIDA_SCRIPT}"
+log "  SAML browser  : ${SAML_BROWSER}"
+log "  SAML pattern  : ${SAML_URL_PATTERN:-"(disabled)"}"
 log ""
 
 if [[ ! -f "$FRIDA_SCRIPT" ]]; then
@@ -123,8 +154,17 @@ fi
 
 while true; do
     if vpn_is_up; then
-        log "VPN is up."
+        if $vpn_was_down; then
+            log "VPN is back up."
+            vpn_was_down=false
+            close_saml_browser_window  # auth completed — close the IdP tab
+        else
+            log "VPN is up."
+        fi
     else
+        if ! $vpn_was_down; then
+            vpn_was_down=true
+        fi
         log "VPN is down."
         attempt_reconnect
     fi

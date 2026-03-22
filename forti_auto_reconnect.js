@@ -27,6 +27,11 @@ const CONFIG = {
   // Set to an IP (e.g. '10.x.x.x') for ping-based check (most reliable).
   // Set to null to use utun interface check instead.
   vpnInternalHost: null,
+  // SAML browser auto-close: after reconnect, close the IdP tab left open in the browser.
+  // Set samlBrowser to the macOS app name and samlUrlPattern to a substring of the IdP URL.
+  // Set samlUrlPattern to null to disable.
+  samlBrowser:     'Google Chrome',  // e.g. 'Safari', 'Google Chrome', 'Brave Browser'
+  samlUrlPattern:  '127.0.0.1:8020', // FortiClient's local SAML callback server — works for any IdP
 };
 
 // ============================================================
@@ -41,6 +46,42 @@ let userInitiatedDisconnect = false;
 // Grace period: when connectTunnel is called, suppress polling for a while
 // to let the tunnel come up before checking the utun interface.
 let connectGraceUntil = 0;
+// SAML browser close: set when a reconnect fires; cleared after VPN comes back up.
+let awaitingBrowserClose = false;
+// Tracks VPN state across poll cycles to detect the down→up transition.
+let vpnWasConnected = false;
+
+// ============================================================
+// SAML browser auto-close
+// Closes the IdP tab left open in the system browser after SAML auth completes.
+// The tab shows the IdP URL that redirected to forticlient:// once auth succeeded.
+// ============================================================
+function closeSamlBrowserWindow() {
+  if (!CONFIG.samlUrlPattern) return;
+
+  const systemFn = new NativeFunction(
+    Module.findExportByName('libSystem.B.dylib', 'system'),
+    'int', ['pointer']
+  );
+
+  // Build osascript command using multiple -e flags to avoid heredoc/quoting complexity.
+  // Uses "tell w / close tab i" (not "close tab i of w") — the only form Chrome accepts.
+  const cmd = `osascript`
+    + ` -e 'tell application "${CONFIG.samlBrowser}"'`
+    + ` -e 'repeat with w in windows'`
+    + ` -e 'tell w'`
+    + ` -e 'set n to count tabs'`
+    + ` -e 'repeat with i from n to 1 by -1'`
+    + ` -e 'if URL of tab i contains "${CONFIG.samlUrlPattern}" then close tab i'`
+    + ` -e 'end repeat'`
+    + ` -e 'end tell'`
+    + ` -e 'end repeat'`
+    + ` -e 'end tell'`;
+
+  console.log(`[*] Closing SAML browser tab (browser: ${CONFIG.samlBrowser}, pattern: ${CONFIG.samlUrlPattern})`);
+  const cmdStr = Memory.allocUtf8String(cmd);
+  systemFn(cmdStr);
+}
 
 // ============================================================
 // connectTunnel helper (reused from existing logic)
@@ -104,6 +145,7 @@ function tryReconnect(reason) {
 
   reconnecting = true;
   lastReconnectTime = now;
+  awaitingBrowserClose = true;  // cleared when polling detects VPN back up
   console.log(`\n[!] VPN disconnected (${reason}), attempting reconnect...`);
 
   try {
@@ -246,10 +288,21 @@ function pollConnectivity() {
     connected = checkVpnByUtun();
   }
 
-  if (!connected && !userInitiatedDisconnect && Date.now() > connectGraceUntil) {
-    tryReconnect(CONFIG.vpnInternalHost
-      ? `ping ${CONFIG.vpnInternalHost} failed`
-      : 'utun interface down');
+  if (connected) {
+    // VPN just came back up after a reconnect — close the SAML browser tab.
+    if (!vpnWasConnected && awaitingBrowserClose) {
+      console.log('[*] VPN back up after reconnect — closing SAML browser window');
+      closeSamlBrowserWindow();
+      awaitingBrowserClose = false;
+    }
+    vpnWasConnected = true;
+  } else {
+    vpnWasConnected = false;
+    if (!userInitiatedDisconnect && Date.now() > connectGraceUntil) {
+      tryReconnect(CONFIG.vpnInternalHost
+        ? `ping ${CONFIG.vpnInternalHost} failed`
+        : 'utun interface down');
+    }
   }
 }
 
