@@ -48,8 +48,6 @@ let userInitiatedDisconnect = false;
 let connectGraceUntil = 0;
 // SAML browser close: set when a reconnect fires; cleared after VPN comes back up.
 let awaitingBrowserClose = false;
-// Tracks VPN state across poll cycles to detect the down→up transition.
-let vpnWasConnected = false;
 
 // Cached system() handle — shared by connectivity checks and browser close.
 const systemFn = new NativeFunction(
@@ -58,16 +56,42 @@ const systemFn = new NativeFunction(
 );
 
 // ============================================================
+// Focus helpers
+// Saves the frontmost app name to a temp file so it can be restored later.
+// Uses a temp file because Frida's system() can't capture stdout.
+// ============================================================
+const FOCUS_TMP = '/tmp/.forti_prev_app';
+
+function saveFocusedApp() {
+  systemFn(Memory.allocUtf8String(
+    `osascript -e 'tell application "System Events" to get name of first application process whose frontmost is true' > ${FOCUS_TMP} 2>/dev/null`
+  ));
+}
+
+function restoreFocusedApp() {
+  systemFn(Memory.allocUtf8String(
+    `prev=$(cat ${FOCUS_TMP} 2>/dev/null) && [ -n "$prev" ] && osascript -e "tell application \\"$prev\\" to activate" 2>/dev/null; rm -f ${FOCUS_TMP}`
+  ));
+}
+
+function hideFortiClient() {
+  systemFn(Memory.allocUtf8String(
+    'osascript -e \'tell application "System Events" to set visible of process "FortiClient" to false\' 2>/dev/null'
+  ));
+}
+
+// ============================================================
 // SAML browser auto-close
 // Closes the IdP tab left open in the system browser after SAML auth completes.
-// The tab shows the IdP URL that redirected to forticlient:// once auth succeeded.
+// Saves and restores the frontmost app so closing the tab doesn't steal focus.
 // ============================================================
 function closeSamlBrowserWindow() {
   if (!CONFIG.samlUrlPattern) return;
 
-  // Build osascript command using multiple -e flags to avoid heredoc/quoting complexity.
+  // Single osascript: save frontmost app, close matching tabs, restore focus.
   // Uses "tell w / close tab i" (not "close tab i of w") — the only form Chrome accepts.
   const cmd = `osascript`
+    + ` -e 'tell application "System Events" to set prevApp to name of first application process whose frontmost is true'`
     + ` -e 'tell application "${CONFIG.samlBrowser}"'`
     + ` -e 'repeat with w in windows'`
     + ` -e 'tell w'`
@@ -77,11 +101,11 @@ function closeSamlBrowserWindow() {
     + ` -e 'end repeat'`
     + ` -e 'end tell'`
     + ` -e 'end repeat'`
-    + ` -e 'end tell'`;
+    + ` -e 'end tell'`
+    + ` -e 'tell application prevApp to activate'`;
 
   console.log(`[*] Closing SAML browser tab (browser: ${CONFIG.samlBrowser}, pattern: ${CONFIG.samlUrlPattern})`);
-  const cmdStr = Memory.allocUtf8String(cmd);
-  systemFn(cmdStr);
+  systemFn(Memory.allocUtf8String(cmd));
 }
 
 // ============================================================
@@ -149,6 +173,9 @@ function tryReconnect(reason) {
   awaitingBrowserClose = true;  // cleared when polling detects VPN back up
   console.log(`\n[!] VPN disconnected (${reason}), attempting reconnect...`);
 
+  // Save the focused app before SAML opens the browser.
+  saveFocusedApp();
+
   try {
     callConnectTunnel();
   } catch (e) {
@@ -156,6 +183,12 @@ function tryReconnect(reason) {
   } finally {
     reconnecting = false;
   }
+
+  // Hide FortiClient and restore focus after the SAML browser has had time to open.
+  setTimeout(() => {
+    hideFortiClient();
+    restoreFocusedApp();
+  }, 5000);
 }
 
 // ============================================================
@@ -276,15 +309,16 @@ function pollConnectivity() {
   }
 
   if (connected) {
-    // VPN just came back up after a reconnect — close the SAML browser tab.
-    if (!vpnWasConnected && awaitingBrowserClose) {
-      console.log('[*] VPN back up after reconnect — closing SAML browser window');
+    if (awaitingBrowserClose) {
+      hideFortiClient();
+      // Close SAML tabs now and retry twice — the tab may not exist yet if
+      // the SAML redirect is still in flight.
       closeSamlBrowserWindow();
+      setTimeout(closeSamlBrowserWindow, 5000);
+      setTimeout(closeSamlBrowserWindow, 15000);
       awaitingBrowserClose = false;
     }
-    vpnWasConnected = true;
   } else {
-    vpnWasConnected = false;
     if (!userInitiatedDisconnect && Date.now() > connectGraceUntil) {
       tryReconnect(CONFIG.vpnInternalHost
         ? `ping ${CONFIG.vpnInternalHost} failed`

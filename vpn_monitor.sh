@@ -32,7 +32,8 @@ fi
 # ─────────────────────────────────────────────────────────────────────
 
 last_reconnect_ts=0
-vpn_was_down=false  # tracks VPN state across poll cycles for transition detection
+vpn_was_down=false
+saml_close_pending=false  # set after script-initiated reconnect; cleared after browser tab close
 
 log() {
     echo "[$(date '+%Y-%m-%d %H:%M:%S')] $*"
@@ -64,15 +65,32 @@ vpn_is_up() {
     fi
 }
 
+# ── Focus helpers ────────────────────────────────────────────────────
+
+save_focused_app() {
+    _saved_app=$(osascript -e 'tell application "System Events" to get name of first application process whose frontmost is true' 2>/dev/null)
+}
+
+restore_focused_app() {
+    [[ -n "$_saved_app" ]] && osascript -e "tell application \"$_saved_app\" to activate" 2>/dev/null
+    _saved_app=""
+}
+
+hide_forticlient() {
+    osascript -e 'tell application "System Events" to set visible of process "FortiClient" to false' 2>/dev/null
+}
+
 # ── SAML browser auto-close ──────────────────────────────────────────
 
 close_saml_browser_window() {
     # Closes the browser tab left open after SAML/SSO auth.
-    # The tab shows the FortiClient local SAML callback page (127.0.0.1:8020).
-    # Iterates by index in reverse so closing a tab doesn't invalidate later references.
+    # Saves and restores the frontmost app so the tab close doesn't steal focus.
     [[ -z "$SAML_URL_PATTERN" ]] && return
     log "Closing SAML browser tab (browser: $SAML_BROWSER, pattern: $SAML_URL_PATTERN)..."
     osascript 2>/dev/null <<OSAEOF
+tell application "System Events"
+    set prevApp to name of first application process whose frontmost is true
+end tell
 tell application "$SAML_BROWSER"
     repeat with w in windows
         tell w
@@ -85,6 +103,7 @@ tell application "$SAML_BROWSER"
         end tell
     end repeat
 end tell
+tell application prevApp to activate
 OSAEOF
     log "SAML browser close done."
 }
@@ -103,6 +122,10 @@ attempt_reconnect() {
 
     log "VPN down — triggering one-shot Frida reconnect..."
     last_reconnect_ts=$now
+    saml_close_pending=true
+
+    # Save the focused app before SAML opens the browser.
+    save_focused_app
 
     # Build a temp script: config preamble + core logic.
     # Frida scripts run in isolated scopes, so we concatenate them into one file.
@@ -131,6 +154,10 @@ attempt_reconnect() {
     # Give FortiClient a moment to start the tunnel after frida detaches.
     sleep 2
 
+    # Hide FortiClient and restore focus stolen by the SAML browser popup.
+    hide_forticlient
+    restore_focused_app
+
     rm -f "$tmp_script"
 }
 
@@ -157,14 +184,20 @@ while true; do
         if $vpn_was_down; then
             log "VPN is back up."
             vpn_was_down=false
-            close_saml_browser_window  # auth completed — close the IdP tab
+            hide_forticlient
+            if $saml_close_pending; then
+                # Close SAML tabs now and retry in the background — the tab
+                # may not exist yet if the SAML redirect is still in flight.
+                close_saml_browser_window
+                ( sleep 5;  close_saml_browser_window;
+                  sleep 10; close_saml_browser_window ) &
+                saml_close_pending=false
+            fi
         else
             log "VPN is up."
         fi
     else
-        if ! $vpn_was_down; then
-            vpn_was_down=true
-        fi
+        vpn_was_down=true
         log "VPN is down."
         attempt_reconnect
     fi
